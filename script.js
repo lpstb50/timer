@@ -77,11 +77,12 @@ function drawDial() {
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
 
-  for (let m = 5; m <= 60; m += 5) {
-    const angle = unitToAngle(m % 60, 60);
+  for (let i = 0; i < 60; i += 5) {
+    const angle = unitToAngle(i, 60);
     const tx = cx + Math.cos(angle) * (outer - 42);
     const ty = cy + Math.sin(angle) * (outer - 42);
-    const label = String(m === 60 ? 60 : m);
+    const labelValue = (60 - i) % 60;
+    const label = String(labelValue);
     ctx.fillText(label, tx, ty);
   }
 }
