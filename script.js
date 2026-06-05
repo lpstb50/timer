@@ -21,6 +21,7 @@ let runStartTime = 0;
 let remainingAtRunStart = remainingMs;
 let rafId = null;
 let draggingHand = false;
+let audioContext = null;
 
 function clampMinutes(value) {
   if (Number.isNaN(value)) return 1;
@@ -32,6 +33,51 @@ function formatTime(ms) {
   const min = Math.floor(totalSec / 60);
   const sec = totalSec % 60;
   return `${String(min).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
+}
+
+function ensureAudioContext() {
+  if (audioContext) return audioContext;
+
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextClass) return null;
+
+  audioContext = new AudioContextClass();
+  return audioContext;
+}
+
+function unlockAudio() {
+  const context = ensureAudioContext();
+  if (!context || context.state !== "suspended") return;
+  context.resume().catch(() => {});
+}
+
+function playAlarm() {
+  const context = ensureAudioContext();
+  if (!context) return;
+
+  unlockAudio();
+
+  const startAt = context.currentTime + 0.02;
+  const beepDurations = [0, 0.28, 0.56];
+
+  beepDurations.forEach((offset, index) => {
+    const oscillator = context.createOscillator();
+    const gainNode = context.createGain();
+    const beepStart = startAt + offset;
+    const beepEnd = beepStart + 0.18;
+
+    oscillator.type = index % 2 === 0 ? "sine" : "triangle";
+    oscillator.frequency.setValueAtTime(880, beepStart);
+    oscillator.connect(gainNode);
+    gainNode.connect(context.destination);
+
+    gainNode.gain.setValueAtTime(0.0001, beepStart);
+    gainNode.gain.exponentialRampToValueAtTime(0.18, beepStart + 0.02);
+    gainNode.gain.exponentialRampToValueAtTime(0.0001, beepEnd);
+
+    oscillator.start(beepStart);
+    oscillator.stop(beepEnd);
+  });
 }
 
 function unitToAngle(unit, maxUnit) {
@@ -201,6 +247,7 @@ function loop(now) {
   if (remainingMs <= 0) {
     render();
     stopRunning();
+    playAlarm();
     return;
   }
 
@@ -209,6 +256,8 @@ function loop(now) {
 }
 
 function startTimer() {
+  unlockAudio();
+
   if (remainingMs <= 0) {
     remainingMs = selectedDurationMs;
   }
@@ -269,6 +318,7 @@ resetBtn.addEventListener("click", () => {
 });
 
 canvas.addEventListener("pointerdown", (event) => {
+  unlockAudio();
   stopRunning();
   draggingHand = true;
   canvas.classList.add("dragging");
